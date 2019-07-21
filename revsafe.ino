@@ -23,7 +23,7 @@
 
 const int sensor_pin = 2; // only pins 2 & 3 support interrupts
 const int killswitch_pin = 3;
-const int max_rpm = 5000;
+const int max_rpm = 4800;
 const unsigned long print_every = 100; // ms
 const unsigned long sleep_after = 10000; // ms
 volatile unsigned long prev_trigger = 0;
@@ -44,6 +44,7 @@ void sensor_trigger(void) {
 }
 
 long rpm() {
+  static long last_rpm;
   unsigned long now = micros();
   
   // cope with micros() wrap-around
@@ -54,17 +55,22 @@ long rpm() {
     
   unsigned long elapsed_us = last_trigger - prev_trigger;
   if (elapsed_us == 0)
-    return 0;
+    return last_rpm;
 
   // rpm is less than half what it was last time: just assume we've stopped
-  if (now - last_trigger > elapsed_us*2)
+  if (now - last_trigger > elapsed_us*2) {
+    last_rpm = 0;
     return 0;
+  }
+  
   // rpm is slowing down, so just linearly drop the estimate until we see the magnet again
   if (now - last_trigger > elapsed_us)
     elapsed_us = now - last_trigger;
   
   // revs-per-min = mins-per-us / us-per-rev
-  return 60000000 / elapsed_us;
+  last_rpm = 60000000 / elapsed_us;
+
+  return last_rpm;
 }
 
 void kill() {
